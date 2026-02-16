@@ -36,6 +36,14 @@ object NodeFS extends js.Object {
   def copyFileSync(source: String, target: String): Unit = js.native
   def renameSync(source: String, target: String): Unit   = js.native
 
+  // fd-based operations
+  def openSync(path: String, flags: String): Int                                                    = js.native
+  def readSync(fd: Int, buffer: Uint8Array, offset: Int, length: Int, position: Double): Int        = js.native
+  def writeSync(fd: Int, buffer: Uint8Array, offset: Int, length: Int, position: Double): Int       = js.native
+  def ftruncateSync(fd: Int, len: Double): Unit                                                     = js.native
+  def fstatSync(fd: Int): NodeStats                                                                 = js.native
+  def closeSync(fd: Int): Unit                                                                      = js.native
+
   // Constants
   val constants: NodeFSConstants = js.native
 }

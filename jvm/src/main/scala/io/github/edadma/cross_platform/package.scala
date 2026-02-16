@@ -5,6 +5,8 @@ import scala.Console.out
 import scala.io.StdIn
 import scala.jdk.CollectionConverters.*
 
+import java.io.{RandomAccessFile => JRandomAccessFile}
+
 def processArgs(a: Seq[String]): IndexedSeq[String] = a.toIndexedSeq
 
 def nameSeparator: String = FileSystems.getDefault.getSeparator
@@ -116,6 +118,45 @@ def fileSize(path: String): Long =
 
 def lastModified(path: String): Long =
   Files.getLastModifiedTime(Paths.get(path)).toMillis
+
+def openRandomAccessFile(path: String, mode: String): RandomAccessFile =
+  val jraf = new JRandomAccessFile(path, mode)
+  new RandomAccessFile:
+    def seek(pos: Long): Unit                        = jraf.seek(pos)
+    def getFilePointer: Long                         = jraf.getFilePointer
+    def length: Long                                 = jraf.length()
+    def setLength(newLength: Long): Unit             = jraf.setLength(newLength)
+    def read: Int                                    = jraf.read()
+    def close(): Unit                                = jraf.close()
+    def readFully(b: Array[Byte]): Unit              = jraf.readFully(b)
+    def readFully(b: Array[Byte], off: Int, len: Int): Unit = jraf.readFully(b, off, len)
+    def skipBytes(n: Int): Int                       = jraf.skipBytes(n)
+    def readBoolean(): Boolean                       = jraf.readBoolean()
+    def readByte(): Byte                             = jraf.readByte()
+    def readUnsignedByte(): Int                      = jraf.readUnsignedByte()
+    def readShort(): Short                           = jraf.readShort()
+    def readUnsignedShort(): Int                     = jraf.readUnsignedShort()
+    def readChar(): Char                             = jraf.readChar()
+    def readInt(): Int                               = jraf.readInt()
+    def readLong(): Long                             = jraf.readLong()
+    def readFloat(): Float                           = jraf.readFloat()
+    def readDouble(): Double                         = jraf.readDouble()
+    def readLine(): String                           = jraf.readLine()
+    def readUTF(): String                            = jraf.readUTF()
+    def write(b: Int): Unit                          = jraf.write(b)
+    def write(b: Array[Byte]): Unit                  = jraf.write(b)
+    def write(b: Array[Byte], off: Int, len: Int): Unit = jraf.write(b, off, len)
+    def writeBoolean(v: Boolean): Unit               = jraf.writeBoolean(v)
+    def writeByte(v: Int): Unit                      = jraf.writeByte(v)
+    def writeShort(v: Int): Unit                     = jraf.writeShort(v)
+    def writeChar(v: Int): Unit                      = jraf.writeChar(v)
+    def writeInt(v: Int): Unit                       = jraf.writeInt(v)
+    def writeLong(v: Long): Unit                     = jraf.writeLong(v)
+    def writeFloat(v: Float): Unit                   = jraf.writeFloat(v)
+    def writeDouble(v: Double): Unit                 = jraf.writeDouble(v)
+    def writeBytes(s: String): Unit                  = jraf.writeBytes(s)
+    def writeChars(s: String): Unit                  = jraf.writeChars(s)
+    def writeUTF(s: String): Unit                    = jraf.writeUTF(s)
 
 def readLine(prompt: String = ""): String =
   print(prompt)

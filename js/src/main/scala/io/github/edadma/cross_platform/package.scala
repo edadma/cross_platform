@@ -166,6 +166,160 @@ def lastModified(path: String): Long = {
   stats.mtime.getTime().toLong
 }
 
+def openRandomAccessFile(path: String, mode: String): RandomAccessFile =
+  val jsFlags = mode match
+    case "r" => "r"
+    case _ =>
+      if !NodeFS.existsSync(path) then NodeFS.writeFileSync(path, "")
+      mode match
+        case "rws" | "rwd" => "rs+"
+        case _             => "r+"
+  val fd = NodeFS.openSync(path, jsFlags)
+  new RandomAccessFile:
+    private var pointer: Long = 0
+
+    def seek(pos: Long): Unit    = pointer = pos
+    def getFilePointer: Long     = pointer
+    def length: Long             = NodeFS.fstatSync(fd).size.toLong
+    def setLength(newLength: Long): Unit = NodeFS.ftruncateSync(fd, newLength.toDouble)
+
+    def read: Int =
+      val buf = new Uint8Array(1)
+      val n = NodeFS.readSync(fd, buf, 0, 1, pointer.toDouble)
+      if n <= 0 then -1
+      else
+        pointer += 1
+        buf(0) & 0xff
+
+    def close(): Unit = NodeFS.closeSync(fd)
+
+    def readFully(b: Array[Byte]): Unit = readFully(b, 0, b.length)
+
+    def readFully(b: Array[Byte], off: Int, len: Int): Unit =
+      val buf = new Uint8Array(len)
+      var totalRead = 0
+      while totalRead < len do
+        val n = NodeFS.readSync(fd, buf, totalRead, len - totalRead, (pointer + totalRead).toDouble)
+        if n <= 0 then throw new java.io.EOFException
+        totalRead += n
+      for i <- 0 until len do b(off + i) = buf(i).toByte
+      pointer += len
+
+    def skipBytes(n: Int): Int =
+      val skipped = n.toLong.min(length - pointer).toInt
+      pointer += skipped
+      skipped
+
+    def readBoolean(): Boolean = readByte() != 0
+    def readByte(): Byte =
+      val v = read
+      if v < 0 then throw new java.io.EOFException
+      v.toByte
+    def readUnsignedByte(): Int =
+      val v = read
+      if v < 0 then throw new java.io.EOFException
+      v
+
+    def readShort(): Short =
+      val b = new Array[Byte](2)
+      readFully(b)
+      (((b(0) & 0xff) << 8) | (b(1) & 0xff)).toShort
+
+    def readUnsignedShort(): Int =
+      val b = new Array[Byte](2)
+      readFully(b)
+      ((b(0) & 0xff) << 8) | (b(1) & 0xff)
+
+    def readChar(): Char = readUnsignedShort().toChar
+
+    def readInt(): Int =
+      val b = new Array[Byte](4)
+      readFully(b)
+      ((b(0) & 0xff) << 24) | ((b(1) & 0xff) << 16) | ((b(2) & 0xff) << 8) | (b(3) & 0xff)
+
+    def readLong(): Long =
+      val b = new Array[Byte](8)
+      readFully(b)
+      ((b(0).toLong & 0xff) << 56) | ((b(1).toLong & 0xff) << 48) |
+        ((b(2).toLong & 0xff) << 40) | ((b(3).toLong & 0xff) << 32) |
+        ((b(4).toLong & 0xff) << 24) | ((b(5).toLong & 0xff) << 16) |
+        ((b(6).toLong & 0xff) << 8) | (b(7).toLong & 0xff)
+
+    def readFloat(): Float  = java.lang.Float.intBitsToFloat(readInt())
+    def readDouble(): Double = java.lang.Double.longBitsToDouble(readLong())
+
+    def readLine(): String =
+      val sb = new StringBuilder
+      var c = read
+      if c == -1 then return null
+      while c != -1 do
+        if c == '\n' then return sb.toString
+        if c == '\r' then
+          val next = read
+          if next != '\n' && next != -1 then pointer -= 1
+          return sb.toString
+        sb.append(c.toChar)
+        c = read
+      sb.toString
+
+    def readUTF(): String = throw new UnsupportedOperationException("readUTF not supported")
+
+    def write(b: Int): Unit =
+      val buf = new Uint8Array(1)
+      buf(0) = (b & 0xff).toShort
+      NodeFS.writeSync(fd, buf, 0, 1, pointer.toDouble)
+      pointer += 1
+
+    def write(b: Array[Byte]): Unit = write(b, 0, b.length)
+
+    def write(b: Array[Byte], off: Int, len: Int): Unit =
+      val buf = new Uint8Array(len)
+      for i <- 0 until len do buf(i) = (b(off + i) & 0xff).toShort
+      var totalWritten = 0
+      while totalWritten < len do
+        val n = NodeFS.writeSync(fd, buf, totalWritten, len - totalWritten, (pointer + totalWritten).toDouble)
+        totalWritten += n
+      pointer += len
+
+    def writeBoolean(v: Boolean): Unit = write(if v then 1 else 0)
+    def writeByte(v: Int): Unit        = write(v)
+
+    def writeShort(v: Int): Unit =
+      write(Array(((v >> 8) & 0xff).toByte, (v & 0xff).toByte))
+
+    def writeChar(v: Int): Unit = writeShort(v)
+
+    def writeInt(v: Int): Unit =
+      write(Array(
+        ((v >> 24) & 0xff).toByte,
+        ((v >> 16) & 0xff).toByte,
+        ((v >> 8) & 0xff).toByte,
+        (v & 0xff).toByte,
+      ))
+
+    def writeLong(v: Long): Unit =
+      write(Array(
+        ((v >> 56) & 0xff).toByte,
+        ((v >> 48) & 0xff).toByte,
+        ((v >> 40) & 0xff).toByte,
+        ((v >> 32) & 0xff).toByte,
+        ((v >> 24) & 0xff).toByte,
+        ((v >> 16) & 0xff).toByte,
+        ((v >> 8) & 0xff).toByte,
+        (v & 0xff).toByte,
+      ))
+
+    def writeFloat(v: Float): Unit   = writeInt(java.lang.Float.floatToIntBits(v))
+    def writeDouble(v: Double): Unit  = writeLong(java.lang.Double.doubleToLongBits(v))
+
+    def writeBytes(s: String): Unit =
+      for c <- s do write(c.toInt & 0xff)
+
+    def writeChars(s: String): Unit =
+      for c <- s do writeChar(c.toInt)
+
+    def writeUTF(s: String): Unit = throw new UnsupportedOperationException("writeUTF not supported")
+
 @js.native
 @JSImport("fs", JSImport.Namespace)
 object fs extends js.Object:

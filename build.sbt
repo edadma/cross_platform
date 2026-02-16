@@ -1,12 +1,14 @@
+import xerial.sbt.Sonatype.sonatypeCentralHost
+
 ThisBuild / licenses               := Seq("ISC" -> url("https://opensource.org/licenses/ISC"))
 ThisBuild / versionScheme          := Some("semver-spec")
 ThisBuild / evictionErrorLevel     := Level.Warn
-ThisBuild / scalaVersion           := "3.7.2"
+ThisBuild / scalaVersion           := "3.8.1"
 ThisBuild / organization           := "io.github.edadma"
 ThisBuild / organizationName       := "edadma"
 ThisBuild / organizationHomepage   := Some(url("https://github.com/edadma"))
-ThisBuild / version                := "0.0.19"
-ThisBuild / sonatypeCredentialHost := "central.sonatype.com"
+ThisBuild / version                := "0.1.0"
+ThisBuild / sonatypeCredentialHost := sonatypeCentralHost
 
 ThisBuild / publishConfiguration := publishConfiguration.value.withOverwrite(true).withChecksums(Vector.empty)
 ThisBuild / resolvers += Resolver.mavenLocal
@@ -30,13 +32,10 @@ ThisBuild / developers := List(
   ),
 )
 
-ThisBuild / homepage := Some(url("https://github.com/edadma/cross_platform"))
+ThisBuild / homepage    := Some(url("https://github.com/edadma/cross_platform"))
+ThisBuild / description := "A cross-platform utility library for Scala"
 
-ThisBuild / publishTo := {
-  val centralSnapshots = "https://central.sonatype.com/repository/maven-snapshots/"
-  if (isSnapshot.value) Some("central-snapshots" at centralSnapshots)
-  else localStaging.value
-}
+ThisBuild / publishTo := sonatypePublishToBundle.value
 
 lazy val cross_platform = crossProject(JSPlatform, JVMPlatform, NativePlatform)
   .in(file("."))
@@ -52,26 +51,25 @@ lazy val cross_platform = crossProject(JSPlatform, JVMPlatform, NativePlatform)
         "-language:existentials",
         "-language:dynamics",
       ),
+    libraryDependencies += "org.scalatest" %%% "scalatest" % "3.2.19" % "test",
     publishMavenStyle      := true,
     Test / publishArtifact := false,
     licenses += "ISC"      -> url("https://opensource.org/licenses/ISC"),
-  ).jvmSettings(
+  )
+  .jvmSettings(
     libraryDependencies += "org.scala-js" %% "scalajs-stubs" % "1.1.0" % "provided",
-  ).nativeSettings(
+  )
+  .nativeSettings(
     libraryDependencies += "org.scala-js" %% "scalajs-stubs" % "1.1.0" % "provided",
-  ).jsSettings(
+  )
+  .jsSettings(
     jsEnv := new org.scalajs.jsenv.nodejs.NodeJSEnv(),
     scalaJSLinkerConfig ~= { _.withModuleKind(ModuleKind.ESModule) },
-    //  scalaJSLinkerConfig ~= { _.withModuleSplitStyle(ModuleSplitStyle.SmallestModules) },
     scalaJSLinkerConfig ~= { _.withSourceMap(false) },
-//    Test / scalaJSUseMainModuleInitializer := true,
-//    Test / scalaJSUseTestModuleInitializer := false,
-//    Test / scalaJSUseMainModuleInitializer := false,
-//    Test / scalaJSUseTestModuleInitializer := true,
-//    scalaJSUseMainModuleInitializer        := true,
   )
 
-lazy val root = project.in(file("."))
+lazy val root = project
+  .in(file("."))
   .aggregate(cross_platform.js, cross_platform.jvm, cross_platform.native)
   .settings(
     name                := "cross_platform",
