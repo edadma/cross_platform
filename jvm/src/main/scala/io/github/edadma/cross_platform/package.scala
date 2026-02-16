@@ -119,6 +119,11 @@ def fileSize(path: String): Long =
 def lastModified(path: String): Long =
   Files.getLastModifiedTime(Paths.get(path)).toMillis
 
+def createTempFile(prefix: String, suffix: String): String =
+  val f = java.io.File.createTempFile(prefix, suffix)
+  f.deleteOnExit()
+  f.getPath
+
 def openRandomAccessFile(path: String, mode: String): RandomAccessFile =
   val jraf = new JRandomAccessFile(path, mode)
   new RandomAccessFile:

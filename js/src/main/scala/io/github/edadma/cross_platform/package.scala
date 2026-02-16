@@ -166,6 +166,13 @@ def lastModified(path: String): Long = {
   stats.mtime.getTime().toLong
 }
 
+def createTempFile(prefix: String, suffix: String): String =
+  val tmpDir = js.Dynamic.global.require("os").tmpdir().asInstanceOf[String]
+  val random = (math.random() * 1000000000).toLong.toString
+  val path = NodePath.join(tmpDir, s"$prefix$random$suffix")
+  NodeFS.writeFileSync(path, "")
+  path
+
 def openRandomAccessFile(path: String, mode: String): RandomAccessFile =
   val jsFlags = mode match
     case "r" => "r"
