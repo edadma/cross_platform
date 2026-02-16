@@ -1,17 +1,14 @@
 package io.github.edadma.cross_platform
 
-import java.io.File
-
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers
 
 class RandomAccessFileTests extends AnyFreeSpec with Matchers:
 
   def withTempFile(test: String => Unit): Unit =
-    val f = File.createTempFile("raf-test", ".dat")
-    f.deleteOnExit()
-    try test(f.getPath)
-    finally f.delete()
+    val path = createTempFile("raf-test", ".dat")
+    try test(path)
+    finally deleteFile(path)
 
   "single byte read/write" in withTempFile { path =>
     val raf = openRandomAccessFile(path, "rw")
@@ -75,6 +72,81 @@ class RandomAccessFileTests extends AnyFreeSpec with Matchers:
     raf.length shouldBe 16
     raf.setLength(4)
     raf.length shouldBe 4
+    raf.close()
+  }
+
+  "setLength extend preserves data and file pointer" in withTempFile { path =>
+    val raf = openRandomAccessFile(path, "rw")
+    raf.writeInt(0xdeadbeef)
+    raf.getFilePointer shouldBe 4
+    raf.setLength(16)
+    raf.length shouldBe 16
+    raf.getFilePointer shouldBe 4 // pointer unchanged after extend
+    raf.seek(0)
+    raf.readInt() shouldBe 0xdeadbeef // original data preserved
+    raf.close()
+  }
+
+  "setLength shrink adjusts file pointer if beyond new end" in withTempFile { path =>
+    val raf = openRandomAccessFile(path, "rw")
+    raf.setLength(100)
+    raf.seek(80)
+    raf.getFilePointer shouldBe 80
+    raf.setLength(20)
+    raf.length shouldBe 20
+    raf.getFilePointer shouldBe 20 // pointer clamped to new end
+    raf.close()
+  }
+
+  "setLength shrink preserves pointer if within bounds" in withTempFile { path =>
+    val raf = openRandomAccessFile(path, "rw")
+    raf.setLength(100)
+    raf.seek(10)
+    raf.setLength(50)
+    raf.length shouldBe 50
+    raf.getFilePointer shouldBe 10 // pointer unchanged
+    raf.close()
+  }
+
+  "setLength to same length is a no-op" in withTempFile { path =>
+    val raf = openRandomAccessFile(path, "rw")
+    raf.writeInt(42)
+    raf.setLength(4)
+    raf.length shouldBe 4
+    raf.seek(0)
+    raf.readInt() shouldBe 42
+    raf.close()
+  }
+
+  "setLength extend from zero" in withTempFile { path =>
+    val raf = openRandomAccessFile(path, "rw")
+    raf.length shouldBe 0
+    raf.setLength(1024)
+    raf.length shouldBe 1024
+    raf.seek(0)
+    raf.read shouldBe 0 // extended region is zero-filled
+    raf.close()
+  }
+
+  "setLength repeated extend and shrink" in withTempFile { path =>
+    val raf = openRandomAccessFile(path, "rw")
+    raf.writeLong(111L)
+    raf.writeLong(222L)
+    raf.length shouldBe 16
+
+    raf.setLength(8) // shrink: drop second long
+    raf.length shouldBe 8
+    raf.seek(0)
+    raf.readLong() shouldBe 111L
+
+    raf.setLength(24) // extend again
+    raf.length shouldBe 24
+    raf.seek(0)
+    raf.readLong() shouldBe 111L // first long still intact
+
+    raf.setLength(0) // shrink to empty
+    raf.length shouldBe 0
+
     raf.close()
   }
 

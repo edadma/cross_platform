@@ -8,6 +8,9 @@ import scala.jdk.CollectionConverters.*
 
 import java.io.{RandomAccessFile => JRandomAccessFile}
 
+import scalanative.unsafe.*
+import scalanative.posix.unistd.{truncate => cTruncate}
+
 def processArgs(a: Seq[String]): IndexedSeq[String] = a.toIndexedSeq
 
 def nameSeparator: String = System.getProperty("file.separator")
@@ -135,7 +138,16 @@ def openRandomAccessFile(path: String, mode: String): RandomAccessFile =
     def seek(pos: Long): Unit                        = jraf.seek(pos)
     def getFilePointer: Long                         = jraf.getFilePointer
     def length: Long                                 = jraf.length()
-    def setLength(newLength: Long): Unit             = jraf.setLength(newLength)
+    def setLength(newLength: Long): Unit =
+      val currentLen = jraf.length()
+      if newLength < currentLen then
+        Zone { cTruncate(toCString(path), newLength.toSize) }
+        if jraf.getFilePointer > newLength then jraf.seek(newLength)
+      else if newLength > currentLen then
+        val savedPos = jraf.getFilePointer
+        jraf.seek(newLength - 1)
+        jraf.write(0)
+        jraf.seek(savedPos)
     def read: Int                                    = jraf.read()
     def close(): Unit                                = jraf.close()
     def readFully(b: Array[Byte]): Unit              = jraf.readFully(b)

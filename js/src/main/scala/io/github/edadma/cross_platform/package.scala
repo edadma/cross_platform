@@ -188,7 +188,9 @@ def openRandomAccessFile(path: String, mode: String): RandomAccessFile =
     def seek(pos: Long): Unit    = pointer = pos
     def getFilePointer: Long     = pointer
     def length: Long             = NodeFS.fstatSync(fd).size.toLong
-    def setLength(newLength: Long): Unit = NodeFS.ftruncateSync(fd, newLength.toDouble)
+    def setLength(newLength: Long): Unit =
+      NodeFS.ftruncateSync(fd, newLength.toDouble)
+      if pointer > newLength then pointer = newLength
 
     def read: Int =
       val buf = new Uint8Array(1)
