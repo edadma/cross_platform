@@ -20,14 +20,14 @@ val files = listFiles(".")
 Add to your `build.sbt`:
 
 ```scala
-libraryDependencies += "io.github.edadma" %%% "cross-platform" % "0.0.6"
+libraryDependencies += "io.github.edadma" %%% "cross_platform" % "0.1.3"
 ```
 
 For cross-platform projects:
 ```scala
 lazy val myProject = crossProject(JSPlatform, JVMPlatform, NativePlatform)
   .settings(
-    libraryDependencies += "io.github.edadma" %%% "cross-platform" % "0.0.6"
+    libraryDependencies += "io.github.edadma" %%% "cross_platform" % "0.1.3"
   )
 ```
 
@@ -103,6 +103,37 @@ val sep = nameSeparator  // "/" on Unix, "\" on Windows
 // Check file permissions
 val canRead = readableFile("file.txt")
 ```
+
+### Random Access File I/O
+```scala
+// Open a file for random read/write access
+val raf = openRandomAccessFile("data.bin", "rw")
+
+// Positional read/write
+raf.writeInt(0x12345678)
+raf.writeLong(42L)
+raf.seek(0)
+val n = raf.readInt()   // 0x12345678
+val v = raf.readLong()  // 42L
+
+// Bulk read/write
+val data = Array[Byte](1, 2, 3, 4)
+raf.write(data)
+raf.seek(0)
+val buf = new Array[Byte](4)
+raf.readFully(buf)
+
+// File size control
+raf.length          // current file size
+raf.setLength(1024) // extend or truncate
+
+// Durable writes
+raf.fsync()  // flush to disk
+
+raf.close()
+```
+
+The `RandomAccessFile` trait implements `java.io.DataInput` and `java.io.DataOutput`, providing the full set of typed read/write methods (`readShort`, `writeDouble`, `readUTF`, etc.). Temporary files can be created with `createTempFile(prefix, suffix)`.
 
 ## Platform Implementations
 
