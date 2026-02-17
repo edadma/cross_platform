@@ -6,4 +6,5 @@ trait RandomAccessFile extends java.io.DataInput with java.io.DataOutput with Au
   def length: Long
   def setLength(newLength: Long): Unit
   def read: Int
+  def fsync(): Unit
   def close(): Unit

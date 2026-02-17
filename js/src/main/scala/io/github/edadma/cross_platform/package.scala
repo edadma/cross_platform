@@ -200,6 +200,7 @@ def openRandomAccessFile(path: String, mode: String): RandomAccessFile =
         pointer += 1
         buf(0) & 0xff
 
+    def fsync(): Unit = NodeFS.fsyncSync(fd)
     def close(): Unit = NodeFS.closeSync(fd)
 
     def readFully(b: Array[Byte]): Unit = readFully(b, 0, b.length)

@@ -42,7 +42,8 @@ object NodeFS extends js.Object {
   def writeSync(fd: Int, buffer: Uint8Array, offset: Int, length: Int, position: Double): Int       = js.native
   def ftruncateSync(fd: Int, len: Double): Unit                                                     = js.native
   def fstatSync(fd: Int): NodeStats                                                                 = js.native
-  def closeSync(fd: Int): Unit                                                                      = js.native
+  def fsyncSync(fd: Int): Unit                                                                       = js.native
+  def closeSync(fd: Int): Unit                                                                       = js.native
 
   // Constants
   val constants: NodeFSConstants = js.native

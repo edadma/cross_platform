@@ -132,6 +132,7 @@ def openRandomAccessFile(path: String, mode: String): RandomAccessFile =
     def length: Long                                 = jraf.length()
     def setLength(newLength: Long): Unit             = jraf.setLength(newLength)
     def read: Int                                    = jraf.read()
+    def fsync(): Unit                                = jraf.getFD.sync()
     def close(): Unit                                = jraf.close()
     def readFully(b: Array[Byte]): Unit              = jraf.readFully(b)
     def readFully(b: Array[Byte], off: Int, len: Int): Unit = jraf.readFully(b, off, len)
