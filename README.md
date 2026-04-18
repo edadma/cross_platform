@@ -20,14 +20,14 @@ val files = listFiles(".")
 Add to your `build.sbt`:
 
 ```scala
-libraryDependencies += "io.github.edadma" %%% "cross_platform" % "0.1.4"
+libraryDependencies += "io.github.edadma" %%% "cross_platform" % "0.1.5"
 ```
 
 For cross-platform projects:
 ```scala
 lazy val myProject = crossProject(JSPlatform, JVMPlatform, NativePlatform)
   .settings(
-    libraryDependencies += "io.github.edadma" %%% "cross_platform" % "0.1.4"
+    libraryDependencies += "io.github.edadma" %%% "cross_platform" % "0.1.5"
   )
 ```
 
