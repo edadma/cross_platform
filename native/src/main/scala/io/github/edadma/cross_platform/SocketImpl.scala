@@ -1,36 +1,96 @@
 package io.github.edadma.cross_platform
 
-import java.io.{BufferedReader, InputStreamReader, OutputStreamWriter, PrintWriter}
-import java.net.{StandardProtocolFamily, UnixDomainSocketAddress}
-import java.nio.channels.{ServerSocketChannel, SocketChannel, Channels}
-import java.nio.file.{Files, Paths}
-
-// Uses Java NIO Unix domain sockets — available in Scala Native 0.5+ via javalib
+import scalanative.unsafe.*
+import scalanative.unsigned.*
+import scalanative.posix.sys.socket.*
+import scalanative.posix.sys.un.*
+import scalanative.posix.unistd.{close => cClose, read => cRead, write => cWrite, unlink => cUnlink}
+import scalanative.posix.string.strncpy
 
 def createSocketServer(path: String): SocketServer =
-  val socketPath = Paths.get(path)
-  Files.deleteIfExists(socketPath)
-  val channel = ServerSocketChannel.open(StandardProtocolFamily.UNIX)
-  channel.bind(UnixDomainSocketAddress.of(socketPath))
+  val fd = socket(AF_UNIX, SOCK_STREAM, 0)
+  if fd < 0 then throw new java.io.IOException("Failed to create socket")
 
+  Zone {
+    cUnlink(toCString(path))
+    val addr = alloc[sockaddr_un]()
+    addr._1 = AF_UNIX.toUShort
+    strncpy(addr._2.at(0), toCString(path), 107.toCSize)
+
+    if bind(fd, addr.asInstanceOf[Ptr[sockaddr]], sizeof[sockaddr_un].toUInt) < 0 then
+      cClose(fd)
+      throw new java.io.IOException(s"Failed to bind socket to $path")
+
+    if listen(fd, 5) < 0 then
+      cClose(fd)
+      throw new java.io.IOException("Failed to listen on socket")
+  }
+
+  val savedPath = path
   new SocketServer:
     def accept(): SocketConnection =
-      val client = channel.accept()
-      new SocketConnection:
-        private val in  = new BufferedReader(new InputStreamReader(Channels.newInputStream(client)))
-        private val out = new PrintWriter(new OutputStreamWriter(Channels.newOutputStream(client)), true)
-        def readLine(): Option[String] = Option(in.readLine())
-        def writeLine(s: String): Unit = out.println(s)
-        def close(): Unit = client.close()
+      val clientFd = scalanative.posix.sys.socket.accept(fd, null, null)
+      if clientFd < 0 then throw new java.io.IOException("Failed to accept connection")
+      fdToConnection(clientFd)
     def close(): Unit =
-      channel.close()
-      Files.deleteIfExists(socketPath)
+      cClose(fd)
+      Zone { cUnlink(toCString(savedPath)) }
 
 def connectSocket(path: String): SocketConnection =
-  val channel = SocketChannel.open(UnixDomainSocketAddress.of(Paths.get(path)))
+  val fd = socket(AF_UNIX, SOCK_STREAM, 0)
+  if fd < 0 then throw new java.io.IOException("Failed to create socket")
+
+  Zone {
+    val addr = alloc[sockaddr_un]()
+    addr._1 = AF_UNIX.toUShort
+    strncpy(addr._2.at(0), toCString(path), 107.toCSize)
+
+    if connect(fd, addr.asInstanceOf[Ptr[sockaddr]], sizeof[sockaddr_un].toUInt) < 0 then
+      cClose(fd)
+      throw new java.io.IOException(s"Failed to connect to $path")
+  }
+
+  fdToConnection(fd)
+
+private def fdToConnection(fd: Int): SocketConnection =
   new SocketConnection:
-    private val in  = new BufferedReader(new InputStreamReader(Channels.newInputStream(channel)))
-    private val out = new PrintWriter(new OutputStreamWriter(Channels.newOutputStream(channel)), true)
-    def readLine(): Option[String] = Option(in.readLine())
-    def writeLine(s: String): Unit = out.println(s)
-    def close(): Unit = channel.close()
+    private val buf = new Array[Byte](8192)
+    private var bufPos = 0
+    private var bufLen = 0
+
+    def readLine(): Option[String] =
+      val sb = new StringBuilder
+      var done = false
+      var eof = false
+      while !done do
+        if bufPos >= bufLen then
+          val cbuf = stackalloc[Byte](8192)
+          val n = cRead(fd, cbuf, 8192.toCSize).toInt
+          if n <= 0 then
+            done = true
+            eof = n < 0 || sb.isEmpty
+          else
+            var i = 0
+            while i < n do
+              buf(i) = cbuf(i)
+              i += 1
+            bufPos = 0
+            bufLen = n
+        if !done && bufPos < bufLen then
+          val b = buf(bufPos)
+          bufPos += 1
+          if b == '\n' then done = true
+          else if b != '\r' then sb.append(b.toChar)
+      if eof then None
+      else Some(sb.result())
+
+    def writeLine(s: String): Unit =
+      val bytes = (s + "\n").getBytes("UTF-8")
+      val cbuf = stackalloc[Byte](bytes.length)
+      var i = 0
+      while i < bytes.length do
+        cbuf(i) = bytes(i)
+        i += 1
+      cWrite(fd, cbuf, bytes.length.toCSize)
+
+    def close(): Unit = cClose(fd)
