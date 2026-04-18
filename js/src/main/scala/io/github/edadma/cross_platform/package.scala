@@ -330,6 +330,14 @@ def openRandomAccessFile(path: String, mode: String): RandomAccessFile =
 
     def writeUTF(s: String): Unit = throw new UnsupportedOperationException("writeUTF not supported")
 
+// --- Unix Domain Sockets (not available synchronously in Node.js) ---
+
+def createSocketServer(path: String): SocketServer =
+  throw new UnsupportedOperationException("Unix domain socket server not supported on JS platform")
+
+def connectSocket(path: String): SocketConnection =
+  throw new UnsupportedOperationException("Unix domain socket client not supported on JS platform")
+
 @js.native
 @JSImport("fs", JSImport.Namespace)
 object fs extends js.Object:

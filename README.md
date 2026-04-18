@@ -20,14 +20,14 @@ val files = listFiles(".")
 Add to your `build.sbt`:
 
 ```scala
-libraryDependencies += "io.github.edadma" %%% "cross_platform" % "0.1.3"
+libraryDependencies += "io.github.edadma" %%% "cross_platform" % "0.1.4"
 ```
 
 For cross-platform projects:
 ```scala
 lazy val myProject = crossProject(JSPlatform, JVMPlatform, NativePlatform)
   .settings(
-    libraryDependencies += "io.github.edadma" %%% "cross_platform" % "0.1.3"
+    libraryDependencies += "io.github.edadma" %%% "cross_platform" % "0.1.4"
   )
 ```
 
@@ -134,6 +134,25 @@ raf.close()
 ```
 
 The `RandomAccessFile` trait implements `java.io.DataInput` and `java.io.DataOutput`, providing the full set of typed read/write methods (`readShort`, `writeDouble`, `readUTF`, etc.). Temporary files can be created with `createTempFile(prefix, suffix)`.
+
+### Unix Domain Sockets
+```scala
+// Server
+val server = createSocketServer("/tmp/my-app.sock")
+val conn = server.accept()
+val msg = conn.readLine()  // Option[String]
+conn.writeLine("response")
+conn.close()
+server.close()
+
+// Client
+val client = connectSocket("/tmp/my-app.sock")
+client.writeLine("request")
+val response = client.readLine()  // Option[String]
+client.close()
+```
+
+Line-oriented protocol over POSIX Unix domain sockets. Available on JVM and Scala Native. The JS platform throws `UnsupportedOperationException` (Node.js sockets are async-only).
 
 ## Platform Implementations
 

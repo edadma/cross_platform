@@ -185,3 +185,100 @@ def readLine(prompt: String = ""): String =
   print(prompt)
   out.flush()
   StdIn.readLine
+
+// --- Unix Domain Sockets ---
+// Uses POSIX C bindings since Scala Native may not support java.net.UnixDomainSocketAddress
+
+import scalanative.posix.sys.socket.*
+import scalanative.posix.sys.un.*
+import scalanative.posix.unistd.{close => cClose, read => cRead, write => cWrite, unlink => cUnlink}
+import scalanative.unsigned.*
+
+def createSocketServer(path: String): SocketServer =
+  val fd = socket(AF_UNIX, SOCK_STREAM, 0)
+  if fd < 0 then throw new java.io.IOException("Failed to create socket")
+
+  Zone { implicit z =>
+    cUnlink(toCString(path)) // remove stale socket
+    val addr = alloc[sockaddr_un]()
+    addr._1 = AF_UNIX.toUShort
+    val pathBytes = path.getBytes("UTF-8")
+    val sunPath = addr.at2
+    for i <- pathBytes.indices do !(sunPath + i) = pathBytes(i)
+    !(sunPath + pathBytes.length) = 0.toByte
+
+    if bind(fd, addr.asInstanceOf[Ptr[sockaddr]], sizeof[sockaddr_un].toUInt) < 0 then
+      cClose(fd)
+      throw new java.io.IOException(s"Failed to bind socket to $path")
+
+    if listen(fd, 5) < 0 then
+      cClose(fd)
+      throw new java.io.IOException("Failed to listen on socket")
+  }
+
+  new SocketServer:
+    def accept(): SocketConnection =
+      val clientFd = scalanative.posix.sys.socket.accept(fd, null, null)
+      if clientFd < 0 then throw new java.io.IOException("Failed to accept connection")
+      fdToConnection(clientFd)
+    def close(): Unit =
+      cClose(fd)
+      Zone { implicit z => cUnlink(toCString(path)) }
+
+def connectSocket(path: String): SocketConnection =
+  val fd = socket(AF_UNIX, SOCK_STREAM, 0)
+  if fd < 0 then throw new java.io.IOException("Failed to create socket")
+
+  Zone { implicit z =>
+    val addr = alloc[sockaddr_un]()
+    addr._1 = AF_UNIX.toUShort
+    val pathBytes = path.getBytes("UTF-8")
+    val sunPath = addr.at2
+    for i <- pathBytes.indices do !(sunPath + i) = pathBytes(i)
+    !(sunPath + pathBytes.length) = 0.toByte
+
+    if connect(fd, addr.asInstanceOf[Ptr[sockaddr]], sizeof[sockaddr_un].toUInt) < 0 then
+      cClose(fd)
+      throw new java.io.IOException(s"Failed to connect to $path")
+  }
+
+  fdToConnection(fd)
+
+private def fdToConnection(fd: Int): SocketConnection =
+  new SocketConnection:
+    private val buf = new Array[Byte](8192)
+    private var bufPos = 0
+    private var bufLen = 0
+
+    def readLine(): Option[String] =
+      val sb = new StringBuilder
+      var done = false
+      while !done do
+        if bufPos >= bufLen then
+          Zone { implicit z =>
+            val cbuf = alloc[Byte](8192)
+            val n = cRead(fd, cbuf, 8192.toULong).toInt
+            if n <= 0 then
+              done = true
+            else
+              for i <- 0 until n do buf(i) = !(cbuf + i)
+              bufPos = 0
+              bufLen = n
+          }
+        if !done && bufPos < bufLen then
+          val b = buf(bufPos)
+          bufPos += 1
+          if b == '\n' then done = true
+          else if b != '\r' then sb.append(b.toChar)
+      if sb.isEmpty && bufPos >= bufLen then None
+      else Some(sb.result())
+
+    def writeLine(s: String): Unit =
+      val bytes = (s + "\n").getBytes("UTF-8")
+      Zone { implicit z =>
+        val cbuf = alloc[Byte](bytes.length)
+        for i <- bytes.indices do !(cbuf + i) = bytes(i)
+        cWrite(fd, cbuf, bytes.length.toULong)
+      }
+
+    def close(): Unit = cClose(fd)

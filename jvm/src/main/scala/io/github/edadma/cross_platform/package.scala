@@ -168,3 +168,41 @@ def readLine(prompt: String = ""): String =
   print(prompt)
   out.flush()
   StdIn.readLine
+
+// --- Unix Domain Sockets ---
+
+def createSocketServer(path: String): SocketServer =
+  import java.net.{StandardProtocolFamily, UnixDomainSocketAddress}
+  import java.nio.channels.{ServerSocketChannel, Channels}
+  import java.io.{BufferedReader, InputStreamReader, OutputStreamWriter, PrintWriter}
+
+  val socketPath = Paths.get(path)
+  Files.deleteIfExists(socketPath)
+  val channel = ServerSocketChannel.open(StandardProtocolFamily.UNIX)
+  channel.bind(UnixDomainSocketAddress.of(socketPath))
+
+  new SocketServer:
+    def accept(): SocketConnection =
+      val client = channel.accept()
+      new SocketConnection:
+        private val in  = new BufferedReader(new InputStreamReader(Channels.newInputStream(client)))
+        private val out = new PrintWriter(new OutputStreamWriter(Channels.newOutputStream(client)), true)
+        def readLine(): Option[String] = Option(in.readLine())
+        def writeLine(s: String): Unit = out.println(s)
+        def close(): Unit = client.close()
+    def close(): Unit =
+      channel.close()
+      Files.deleteIfExists(socketPath)
+
+def connectSocket(path: String): SocketConnection =
+  import java.net.UnixDomainSocketAddress
+  import java.nio.channels.{SocketChannel, Channels}
+  import java.io.{BufferedReader, InputStreamReader, OutputStreamWriter, PrintWriter}
+
+  val channel = SocketChannel.open(UnixDomainSocketAddress.of(Paths.get(path)))
+  new SocketConnection:
+    private val in  = new BufferedReader(new InputStreamReader(Channels.newInputStream(channel)))
+    private val out = new PrintWriter(new OutputStreamWriter(Channels.newOutputStream(channel)), true)
+    def readLine(): Option[String] = Option(in.readLine())
+    def writeLine(s: String): Unit = out.println(s)
+    def close(): Unit = channel.close()
