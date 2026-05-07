@@ -20,10 +20,16 @@ def writeFile(file: String, data: String): Unit = NodeFS.writeFileSync(file, dat
 
 def appendFile(file: String, data: String): Unit = NodeFS.appendFileSync(file, data)
 
-def readableFile(file: String): Boolean = {
-  NodeFS.accessSync(file, NodeFS.constants.R_OK)
-  true
-}
+def readableFile(file: String): Boolean =
+  // NodeFS.accessSync throws (with errno ENOENT / EACCES / etc.) when the
+  // file is missing or unreadable; collapse that into `false` so the
+  // surface matches the JVM and Native implementations.
+  try {
+    NodeFS.accessSync(file, NodeFS.constants.R_OK)
+    true
+  } catch {
+    case _: Throwable => false
+  }
 
 def listFiles(directory: String): Seq[String] = {
   if (NodeFS.existsSync(directory)) {

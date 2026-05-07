@@ -184,6 +184,6 @@ def openRandomAccessFile(path: String, mode: String): RandomAccessFile =
 def readLine(prompt: String = ""): String =
   print(prompt)
   out.flush()
-  StdIn.readLine
+  StdIn.readLine()
 
 // Unix Domain Sockets are in SocketImpl.scala (uses Java NIO)
