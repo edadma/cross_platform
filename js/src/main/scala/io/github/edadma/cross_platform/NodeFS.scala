@@ -30,6 +30,7 @@ object NodeFS extends js.Object {
   def mkdirSync(path: String): Unit                  = js.native
   def mkdirSync(path: String, options: js.Any): Unit = js.native
   def rmdirSync(path: String): Unit                  = js.native
+  def mkdtempSync(prefix: String): String            = js.native
 
   // File operations
   def unlinkSync(path: String): Unit                     = js.native

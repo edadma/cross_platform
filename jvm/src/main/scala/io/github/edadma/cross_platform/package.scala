@@ -124,6 +124,16 @@ def createTempFile(prefix: String, suffix: String): String =
   f.deleteOnExit()
   f.getPath
 
+/** Create a fresh temporary directory under the system's default temp
+  * location, with the given name prefix. The directory is created
+  * (mode 0700 on POSIX) and its absolute path is returned. The caller
+  * owns the directory; nothing auto-deletes it. Matches the semantics
+  * of `java.nio.file.Files.createTempDirectory(prefix)` on JVM,
+  * `fs.mkdtempSync` on Node, and `Files.createTempDirectory` on Native.
+  */
+def createTempDirectory(prefix: String): String =
+  Files.createTempDirectory(prefix).toString
+
 def openRandomAccessFile(path: String, mode: String): RandomAccessFile =
   val jraf = new JRandomAccessFile(path, mode)
   new RandomAccessFile:

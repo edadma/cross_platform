@@ -20,14 +20,14 @@ val files = listFiles(".")
 Add to your `build.sbt`:
 
 ```scala
-libraryDependencies += "io.github.edadma" %%% "cross_platform" % "0.1.5"
+libraryDependencies += "io.github.edadma" %%% "cross_platform" % "0.1.7"
 ```
 
 For cross-platform projects:
 ```scala
 lazy val myProject = crossProject(JSPlatform, JVMPlatform, NativePlatform)
   .settings(
-    libraryDependencies += "io.github.edadma" %%% "cross_platform" % "0.1.5"
+    libraryDependencies += "io.github.edadma" %%% "cross_platform" % "0.1.7"
   )
 ```
 
@@ -70,6 +70,14 @@ entries.foreach { entry =>
 // Create directories
 createDirectory("new-folder")
 createDirectories("path/to/nested/folders")  // Creates parent dirs
+
+// Temporary directory under the system's default temp location.
+// Returns the absolute path of a freshly created directory; the
+// caller owns it and is responsible for cleanup. Uses
+// `Files.createTempDirectory` on JVM/Native and `fs.mkdtempSync`
+// on Node.
+val workDir = createTempDirectory("myapp-")
+// → e.g. /var/folders/.../myapp-AbC123 on macOS
 ```
 
 ### File Management
@@ -133,7 +141,7 @@ raf.fsync()  // flush to disk
 raf.close()
 ```
 
-The `RandomAccessFile` trait implements `java.io.DataInput` and `java.io.DataOutput`, providing the full set of typed read/write methods (`readShort`, `writeDouble`, `readUTF`, etc.). Temporary files can be created with `createTempFile(prefix, suffix)`.
+The `RandomAccessFile` trait implements `java.io.DataInput` and `java.io.DataOutput`, providing the full set of typed read/write methods (`readShort`, `writeDouble`, `readUTF`, etc.). Temporary files can be created with `createTempFile(prefix, suffix)`; temporary directories with `createTempDirectory(prefix)`.
 
 ### Unix Domain Sockets
 ```scala

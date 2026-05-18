@@ -179,6 +179,17 @@ def createTempFile(prefix: String, suffix: String): String =
   NodeFS.writeFileSync(path, "")
   path
 
+/** Create a fresh temporary directory under the system's default temp
+  * location, with the given name prefix. Returns the absolute path.
+  * On Node this delegates to `fs.mkdtempSync`, which appends six
+  * random characters to the prefix and creates the directory
+  * atomically.
+  */
+def createTempDirectory(prefix: String): String =
+  val tmpDir   = js.Dynamic.global.require("os").tmpdir().asInstanceOf[String]
+  val template = NodePath.join(tmpDir, prefix)
+  NodeFS.mkdtempSync(template)
+
 def openRandomAccessFile(path: String, mode: String): RandomAccessFile =
   val jsFlags = mode match
     case "r" => "r"

@@ -132,6 +132,13 @@ def createTempFile(prefix: String, suffix: String): String =
   f.deleteOnExit()
   f.getPath
 
+/** Create a fresh temporary directory under the system's default temp
+  * location, with the given name prefix. Returns the absolute path of
+  * the created directory. See the JVM impl for full semantics.
+  */
+def createTempDirectory(prefix: String): String =
+  Files.createTempDirectory(prefix).toString
+
 def openRandomAccessFile(path: String, mode: String): RandomAccessFile =
   val jraf = new JRandomAccessFile(path, mode)
   new RandomAccessFile:
