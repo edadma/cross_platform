@@ -1,5 +1,9 @@
 # Cross-Platform - Unified File System Operations for Scala
 
+![Maven Central](https://img.shields.io/maven-central/v/io.github.edadma/cross_platform_sjs1_3)
+[![Last Commit](https://img.shields.io/github/last-commit/edadma/cross_platform)](https://github.com/edadma/cross_platform/commits)
+![GitHub](https://img.shields.io/github/license/edadma/cross_platform)
+
 A lightweight library providing consistent file system and process operations across JVM, Scala.js, and Scala Native platforms.
 
 ## Why Cross-Platform?
