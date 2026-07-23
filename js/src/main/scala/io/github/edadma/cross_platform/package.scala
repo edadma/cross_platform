@@ -8,6 +8,26 @@ import scala.scalajs.js.typedarray.Uint8Array
 def processArgs(a: Seq[String]): IndexedSeq[String] =
   js.Dynamic.global.process.argv.asInstanceOf[js.Array[String]] drop 2 toIndexedSeq
 
+/** Run an external command to completion, capturing its stdout and stderr. `command` is the
+ * program followed by its arguments (no shell involved). Backed by Node's synchronous
+ * `child_process.spawnSync`; a command that cannot be started yields exit code `-1`.
+ */
+def exec(command: Seq[String]): ProcessResult = {
+  require(command.nonEmpty, "exec: command must be non-empty")
+
+  val childProcess = js.Dynamic.global.require("child_process")
+  val args         = js.Array(command.tail*)
+  val opts         = js.Dynamic.literal(encoding = "utf8", maxBuffer = 256 * 1024 * 1024)
+  val result       = childProcess.spawnSync(command.head, args, opts)
+
+  def str(v: js.Dynamic): String = if (v == null || js.isUndefined(v)) "" else v.toString
+
+  val status = result.status
+  val code   = if (status == null || js.isUndefined(status)) -1 else status.asInstanceOf[Int]
+
+  ProcessResult(code, str(result.stdout), str(result.stderr))
+}
+
 private val process = js.Dynamic.global.process
 
 def nameSeparator: String = NodePath.sep

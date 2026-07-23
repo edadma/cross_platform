@@ -9,6 +9,43 @@ import java.io.{RandomAccessFile => JRandomAccessFile}
 
 def processArgs(a: Seq[String]): IndexedSeq[String] = a.toIndexedSeq
 
+/** Run an external command to completion, capturing its stdout and stderr. `command` is the
+ * program followed by its arguments (no shell involved). stderr is drained on a separate
+ * thread so a command that fills one pipe while we read the other cannot deadlock.
+ */
+def exec(command: Seq[String]): ProcessResult = {
+  require(command.nonEmpty, "exec: command must be non-empty")
+
+  try {
+    val proc = new ProcessBuilder(command*).start()
+    proc.getOutputStream.close()
+
+    var errText          = ""
+    val errThread        = new Thread(() => errText = drainStream(proc.getErrorStream))
+    errThread.start()
+    val outText = drainStream(proc.getInputStream)
+    errThread.join()
+    val code = proc.waitFor()
+
+    ProcessResult(code, outText, errText)
+  } catch {
+    case e: java.io.IOException => ProcessResult(-1, "", e.getMessage)
+  }
+}
+
+private def drainStream(in: java.io.InputStream): String = {
+  val buf   = new java.io.ByteArrayOutputStream()
+  val chunk = new Array[Byte](8192)
+  var n     = in.read(chunk)
+
+  while (n != -1) {
+    buf.write(chunk, 0, n)
+    n = in.read(chunk)
+  }
+
+  new String(buf.toByteArray, "UTF-8")
+}
+
 def nameSeparator: String = FileSystems.getDefault.getSeparator
 
 def getCurrentDirectory: String = System.getProperty("user.dir")
