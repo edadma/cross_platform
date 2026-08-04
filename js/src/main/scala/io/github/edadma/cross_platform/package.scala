@@ -34,6 +34,39 @@ def nameSeparator: String = NodePath.sep
 
 def getCurrentDirectory: String = process.cwd().toString
 
+/** A variable from the process environment, absent where it is unset **or empty**.
+ *
+ * An empty variable is treated as unset because that is what it means in practice: a shell that
+ * exports `HOME=` has not given a home directory, and a caller falling back on the next candidate is
+ * right where one that took `""` and built `"/.cache"` from it is not.
+ *
+ * `process.env` rather than Scala's `sys.env`, which under Scala.js is **always empty** — there is no
+ * portable process environment in a browser, so the standard library answers with nothing rather than
+ * reaching for a Node global. That silence is the reason this function exists: code written against
+ * `sys.env` compiles for JS and then reads no variables at all.
+ */
+def envVar(name: String): Option[String] = {
+  val value = process.env.selectDynamic(name)
+
+  if (value == null || js.isUndefined(value)) None
+  else Option(value.toString).map(_.trim).filter(_.nonEmpty)
+}
+
+/** The user's home directory, where the platform has one.
+ *
+ * Node's `os.homedir()` is the fallback rather than the source, so that a process run under a changed
+ * environment gets the home it was actually given.
+ */
+def homeDirectory: Option[String] =
+  envVar("HOME")
+    .orElse(envVar("USERPROFILE"))
+    .orElse {
+      val home = js.Dynamic.global.require("os").homedir()
+
+      if (home == null || js.isUndefined(home)) None
+      else Option(home.toString).map(_.trim).filter(_.nonEmpty)
+    }
+
 def readFile(file: String): String = NodeFS.readFileSync(file, "utf8")
 
 def writeFile(file: String, data: String): Unit = NodeFS.writeFileSync(file, data)

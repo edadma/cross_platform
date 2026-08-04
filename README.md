@@ -147,6 +147,33 @@ raf.close()
 
 The `RandomAccessFile` trait implements `java.io.DataInput` and `java.io.DataOutput`, providing the full set of typed read/write methods (`readShort`, `writeDouble`, `readUTF`, etc.). Temporary files can be created with `createTempFile(prefix, suffix)`; temporary directories with `createTempDirectory(prefix)`.
 
+### Environment and Well-Known Directories
+```scala
+// A variable the process was started with. Unset *and empty* both give None,
+// so an `.orElse` chain cannot build a path out of "".
+val editor = envVar("EDITOR")          // Option[String]
+
+// The user's home. HOME first, then USERPROFILE, then the platform's own
+// answer (`user.home` on JVM/Native, `os.homedir()` on Node).
+val home = homeDirectory               // Option[String]
+
+// Where derived files belong — things the program can rebuild if they vanish.
+// XDG_CACHE_HOME, else %LOCALAPPDATA%, else ~/Library/Caches on macOS,
+// else ~/.cache. Append your own name to it.
+val cache = cacheDirectory.map(c => s"$c/myapp")
+```
+
+On Scala.js these read Node's `process.env` rather than Scala's `sys.env`, which is **always empty**
+under Scala.js — there is no portable process environment in a browser, so the standard library
+answers with nothing instead of reaching for a Node global. Code written against `sys.env` therefore
+compiles for JS and silently reads no variables at all; that is the whole reason `envVar` exists.
+
+`cacheDirectory` honours each platform's own convention because that is what the platform's own
+housekeeping knows to clean up. macOS is detected by asking whether `~/Library/Caches` is there
+rather than by reading an OS name — the question being answered is precisely *does this machine keep
+caches there*, and a probe cannot disagree with the filesystem the way a name can. An explicit
+`XDG_CACHE_HOME` wins everywhere, macOS included, on the grounds that somebody who set it meant it.
+
 ### Unix Domain Sockets
 ```scala
 // Server

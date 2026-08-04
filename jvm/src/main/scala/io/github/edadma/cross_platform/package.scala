@@ -50,6 +50,27 @@ def nameSeparator: String = FileSystems.getDefault.getSeparator
 
 def getCurrentDirectory: String = System.getProperty("user.dir")
 
+/** A variable from the process environment, absent where it is unset **or empty**.
+ *
+ * An empty variable is treated as unset because that is what it means in practice: a shell that
+ * exports `HOME=` has not given a home directory, and a caller falling back on the next candidate is
+ * right where one that took `""` and built `"/.cache"` from it is not.
+ */
+def envVar(name: String): Option[String] =
+  Option(System.getenv(name)).map(_.trim).filter(_.nonEmpty)
+
+/** The user's home directory, where the platform has one.
+ *
+ * `HOME` is consulted before the JVM's `user.home` property so that a process run under a changed
+ * environment — a test, a sandbox, a service account — gets the home it was actually given. The
+ * property is a fallback rather than the source, and its `"?"` is filtered: that is what it reports
+ * on a platform where the home is unknown, and it is not a path.
+ */
+def homeDirectory: Option[String] =
+  envVar("HOME")
+    .orElse(envVar("USERPROFILE"))
+    .orElse(Option(System.getProperty("user.home")).map(_.trim).filter(h => h.nonEmpty && h != "?"))
+
 def readFile(file: String): String = Files.readString(Paths.get(file))
 
 def writeFile(file: String, data: String): Unit =
