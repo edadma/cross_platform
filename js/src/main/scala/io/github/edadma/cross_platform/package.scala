@@ -85,7 +85,7 @@ def readableFile(file: String): Boolean =
   }
 
 def listFiles(directory: String): Seq[String] = {
-  if (NodeFS.existsSync(directory)) {
+  if (isDirectory(directory)) {
     NodeFS.readdirSync(directory)
       .asInstanceOf[js.Array[String]]
       .map(file => NodePath.resolve(directory, file).toString)
@@ -179,8 +179,8 @@ def writeBytes(path: String, data: Array[Byte]): Unit = {
 }
 
 def listDirectoryWithTypes(path: String): Vector[DirectoryEntry] = {
-  if (!NodeFS.existsSync(path)) {
-    throw new IllegalArgumentException(s"Path does not exist: $path")
+  if (!isDirectory(path)) {
+    throw new IllegalArgumentException(s"Path is not a directory: $path")
   }
 
   val files = NodeFS.readdirSync(path)
