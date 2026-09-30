@@ -5,6 +5,7 @@ import java.nio.file.{Files, Paths, StandardCopyOption, StandardOpenOption}
 import scala.Console.out
 import scala.io.StdIn
 import scala.jdk.CollectionConverters.*
+import scala.util.Using
 
 import java.io.{RandomAccessFile => JRandomAccessFile}
 
@@ -37,18 +38,22 @@ def exec(command: Seq[String]): ProcessResult = {
   }
 }
 
-private def drainStream(in: java.io.InputStream): String = {
-  val buf   = new java.io.ByteArrayOutputStream()
-  val chunk = new Array[Byte](8192)
-  var n     = in.read(chunk)
+/** Read a process pipe to its end and close it, so the descriptor is given back whether the read
+ * finishes or fails.
+ */
+private def drainStream(in: java.io.InputStream): String =
+  Using.resource(in) { in =>
+    val buf   = new java.io.ByteArrayOutputStream()
+    val chunk = new Array[Byte](8192)
+    var n     = in.read(chunk)
 
-  while (n != -1) {
-    buf.write(chunk, 0, n)
-    n = in.read(chunk)
+    while (n != -1) {
+      buf.write(chunk, 0, n)
+      n = in.read(chunk)
+    }
+
+    new String(buf.toByteArray, "UTF-8")
   }
-
-  new String(buf.toByteArray, "UTF-8")
-}
 
 def nameSeparator: String = System.getProperty("file.separator")
 
@@ -76,12 +81,8 @@ def homeDirectory: Option[String] =
 
 def readFile(file: String): String = Files.readString(Paths.get(file))
 
-def writeFile(file: String, data: String): Unit = {
-  val f = new FileWriter(file)
-
-  f.write(data)
-  f.close()
-}
+def writeFile(file: String, data: String): Unit =
+  Using.resource(new FileWriter(file))(_.write(data))
 
 def appendFile(file: String, data: String): Unit =
   Files.writeString(Paths.get(file), data, StandardOpenOption.CREATE, StandardOpenOption.APPEND)
@@ -92,15 +93,22 @@ def readableFile(file: String): Boolean = {
   Files.isReadable(path) && Files.isRegularFile(path)
 }
 
+/** The entries of a directory, as absolute paths, sorted.
+ *
+ * The `Files.list` stream is closed on every exit, an exception while reading included, so the
+ * directory handle behind it is given back rather than held until the process ends.
+ */
 def listFiles(directory: String): Seq[String] = {
   val dirPath = Paths.get(directory)
   if (Files.isDirectory(dirPath)) {
-    Files.list(dirPath)
-      .iterator()
-      .asScala
-      .map(_.toAbsolutePath.normalize.toString)
-      .toSeq
-      .sorted
+    Using.resource(Files.list(dirPath)) { entries =>
+      entries
+        .iterator()
+        .asScala
+        .map(_.toAbsolutePath.normalize.toString)
+        .toVector
+        .sorted
+    }
   } else {
     throw new IllegalArgumentException(s"$directory is not a directory or does not exist")
   }
@@ -153,7 +161,9 @@ def listDirectoryWithTypes(path: String): Vector[DirectoryEntry] = {
     throw new IllegalArgumentException(s"Path is not a directory: $path")
   }
 
-  Files.list(javaPath).iterator().asScala.toVector.map { entry =>
+  val entries = Using.resource(Files.list(javaPath))(_.iterator().asScala.toVector)
+
+  entries.map { entry =>
     val name     = entry.getFileName.toString
     val fileType = if (Files.isDirectory(entry)) FileType.Directory
     else if (Files.isSymbolicLink(entry)) FileType.SymbolicLink

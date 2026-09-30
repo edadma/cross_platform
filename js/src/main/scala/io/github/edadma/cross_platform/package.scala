@@ -440,39 +440,41 @@ def readLine(prompt: String = ""): String =
   val buf       = new Uint8Array(1024)
   val sb        = new StringBuilder
 
-  var done = false
-  while !done do
-    val n = fs.readSync(fd, buf, 0, buf.length)
-    if n <= 0 then
-      // EOF before newline: finish whatever we decoded so far
-      val tail = decoder.decode()
-      if tail.nonEmpty then sb.append(tail)
-      done = true
-    else
-      // scan for newline among the bytes we got
-      var nlIdx = -1
-      var i     = 0
-      while i < n && nlIdx == -1 do
-        if buf(i) == 0x0a then nlIdx = i // '\n'
-        i += 1
-
-      if nlIdx >= 0 then
-        // Handle optional '\r' before '\n'
-        val endExclusive = if nlIdx > 0 && buf(nlIdx - 1) == 0x0d then nlIdx - 1 else nlIdx
-        val slice        = buf.subarray(0, endExclusive)
-        // Final chunk: stream=false to flush decoder
-        val part = decoder.decode(slice, js.Dynamic.literal(stream = false).asInstanceOf[js.Object])
-        if part.nonEmpty then sb.append(part)
+  // The terminal is closed however the read ends, a failed readSync included.
+  try
+    var done = false
+    while !done do
+      val n = fs.readSync(fd, buf, 0, buf.length)
+      if n <= 0 then
+        // EOF before newline: finish whatever we decoded so far
+        val tail = decoder.decode()
+        if tail.nonEmpty then sb.append(tail)
         done = true
       else
-        // No newline yet: stream this chunk
-        val slice = buf.subarray(0, n)
-        val part  = decoder.decode(slice, js.Dynamic.literal(stream = true).asInstanceOf[js.Object])
-        if part.nonEmpty then sb.append(part)
+        // scan for newline among the bytes we got
+        var nlIdx = -1
+        var i     = 0
+        while i < n && nlIdx == -1 do
+          if buf(i) == 0x0a then nlIdx = i // '\n'
+          i += 1
 
-  if needClose then
-    try fs.closeSync(fd)
-    catch case _: Throwable => ()
+        if nlIdx >= 0 then
+          // Handle optional '\r' before '\n'
+          val endExclusive = if nlIdx > 0 && buf(nlIdx - 1) == 0x0d then nlIdx - 1 else nlIdx
+          val slice        = buf.subarray(0, endExclusive)
+          // Final chunk: stream=false to flush decoder
+          val part = decoder.decode(slice, js.Dynamic.literal(stream = false).asInstanceOf[js.Object])
+          if part.nonEmpty then sb.append(part)
+          done = true
+        else
+          // No newline yet: stream this chunk
+          val slice = buf.subarray(0, n)
+          val part  = decoder.decode(slice, js.Dynamic.literal(stream = true).asInstanceOf[js.Object])
+          if part.nonEmpty then sb.append(part)
+  finally
+    if needClose then
+      try fs.closeSync(fd)
+      catch case _: Throwable => ()
 
   sb.result()
 end readLine
